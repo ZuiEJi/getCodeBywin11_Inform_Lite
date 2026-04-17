@@ -1,0 +1,6 @@
+{
+    "LLM_API_KEY": "",
+    "LLM_MODEL": "",
+    "LLM_BASE_URL": "https://ark.cn-beijing.volces.com/api/v3",
+    "EXTRACT_MODE": "REGEX"
+}
