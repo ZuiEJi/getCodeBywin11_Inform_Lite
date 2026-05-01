@@ -12,11 +12,12 @@ import queue
 import re
 import pystray
 from PIL import Image, ImageDraw
-from winsdk.windows.ui.notifications.management import UserNotificationListener
-from winsdk.windows.ui.notifications import NotificationKinds
+from winrt.windows.ui.notifications.management import UserNotificationListener
+from winrt.windows.ui.notifications import NotificationKinds
 
 CONFIG_FILE = 'config.json'
 APP_NAME = "VerifyCodeProLite"
+
 
 
 def get_exe_path():
@@ -128,12 +129,16 @@ class MonitorTask:
     async def monitor(self):
         listener = UserNotificationListener.current
         access = await listener.request_access_async()
+        print(f"[DEBUG] 通知访问权限状态: {access} (1=允许)")
         if access != 1:
+            print("[DEBUG] 通知权限未授予，监听退出")
             return
 
         known_ids = set()
-        for n in await listener.get_notifications_async(NotificationKinds.TOAST):
+        notifications = await listener.get_notifications_async(NotificationKinds.TOAST)
+        for n in notifications:
             known_ids.add(n.id)
+        print(f"[DEBUG] 初始已知通知数: {len(known_ids)}")
 
         TARGET_APPS = ["QQ", "邮件", "Mail", "Outlook", "微信", "Chrome"]
 
@@ -143,11 +148,13 @@ class MonitorTask:
                 for n in notifications:
                     if n.id not in known_ids:
                         app_name = n.app_info.display_info.display_name
+                        print(f"[DEBUG] 新通知来源: '{app_name}'")
                         if any(target in app_name for target in TARGET_APPS):
                             bindings = n.notification.visual.bindings
                             if len(bindings) > 0:
                                 texts = bindings[0].get_text_elements()
                                 full_text = " | ".join([t.text for t in texts if t.text])
+                                print(f"[DEBUG] 通知内容: '{full_text}'")
                                 if full_text:
                                     # 根据用户配置动态选择提取引擎
                                     mode = current_config.get("EXTRACT_MODE", "REGEX")
@@ -156,12 +163,16 @@ class MonitorTask:
                                     else:
                                         code = extract_by_regex(full_text)
 
+                                    print(f"[DEBUG] 提取结果: '{code}'")
                                     if code:
                                         pyperclip.copy(code)
                                         winsound.MessageBeep(winsound.MB_OK)
+                                        print(f"[DEBUG] 已复制到剪贴板: '{code}'")
+                        else:
+                            print(f"[DEBUG] 应用 '{app_name}' 不在监控列表中，跳过")
                         known_ids.add(n.id)
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[DEBUG] 异常: {type(e).__name__}: {e}")
             await asyncio.sleep(0.5)
 
     def start(self):
